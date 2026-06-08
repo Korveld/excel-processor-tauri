@@ -72,7 +72,6 @@ src-tauri/
 | Dependency | Version | Role |
 |------------|---------|------|
 | `tauri` | 2 | App framework |
-| `calamine` | 0.26 | Read `.xlsx` files |
-| `rust_xlsxwriter` | 0.81 | Write `.xlsx` files |
+| `umya-spreadsheet` | 3 | Read and write `.xlsx` files |
 | `tauri-plugin-dialog` | 2 | Native file open/save dialogs |
 | `react` | 19 | UI |

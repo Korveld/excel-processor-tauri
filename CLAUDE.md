@@ -9,8 +9,7 @@ A Tauri v2 desktop app (React + TypeScript frontend, Rust backend) that processe
 - **Frontend**: React 19, TypeScript, Vite — lives in `src/`
 - **Backend**: Rust (Tauri v2) — lives in `src-tauri/src/lib.rs`
 - **Package manager**: bun
-- **Excel reading**: `calamine 0.26`
-- **Excel writing**: `rust_xlsxwriter 0.81`
+- **Excel reading + writing**: `umya-spreadsheet 3`
 - **File dialogs**: `tauri-plugin-dialog 2`
 
 ## Commands
@@ -55,4 +54,6 @@ This overwrites everything in `src-tauri/icons/` including `.icns`, `.ico`, all 
 - The `process_excel` Tauri command is `async` and uses `tauri::async_runtime::spawn_blocking` to run the blocking file I/O on a thread pool, keeping the macOS event loop free (avoids beachball).
 - `flushSync` is used in the React handler before `invoke` to guarantee the spinner renders before the Rust work begins (React 18 batches state updates and would otherwise defer the repaint until after the async call).
 - File dialogs are handled entirely on the JS side via `@tauri-apps/plugin-dialog` — no Rust command needed for open/save pickers.
+- `std::panic::catch_unwind` wraps the sync processing so any unexpected library panics are caught and returned as user-visible error messages rather than silently crashing.
+- Excel I/O uses `umya-spreadsheet` (replaces the original `calamine` + `rust_xlsxwriter` pair). `calamine` had a persistent panic on multi-byte Unicode characters (e.g. `→`) in cell values — `umya-spreadsheet` handles these correctly.
 - DevTools can be re-enabled for debugging by adding `.setup(|app| { app.get_webview_window("main").unwrap().open_devtools(); Ok(()) })` to the Tauri builder in `lib.rs` (guarded with `#[cfg(debug_assertions)]`).
