@@ -1,6 +1,6 @@
 # Excel Processor
 
-A macOS desktop app for processing Excel log files. Built with Tauri v2, React, and Rust.
+A cross-platform desktop app for processing Excel log files. Built with Tauri v2, React, and Rust. Runs on macOS, Windows, and Linux.
 
 ## What it does
 
@@ -15,7 +15,6 @@ Example — a cell value of `foo Jan/25; bar; 8` with search string `Jan/25` bec
 
 - [Rust](https://rustup.rs) (stable)
 - [Bun](https://bun.sh)
-- macOS (the bundle targets `.app` / `.dmg`)
 
 ## Setup
 
@@ -37,26 +36,35 @@ Starts the Vite dev server and Tauri in dev mode. The frontend hot-reloads; Rust
 bun tauri build
 ```
 
-Produces a signed `.app` and `.dmg` in:
+Produces platform-native bundles in `src-tauri/target/release/bundle/`:
 
-```
-src-tauri/target/release/bundle/macos/excel_processor_tauri.app
-src-tauri/target/release/bundle/dmg/excel_processor_tauri_0.1.0_aarch64.dmg
-```
+| Platform | Output |
+|----------|--------|
+| macOS | `.app` + `.dmg` |
+| Windows | `.exe` installer + `.msi` |
+| Linux | `.AppImage` + `.deb` + `.rpm` |
+
+## Releases
+
+Pre-built binaries for all platforms are available on the [Releases](../../releases) page.
 
 ## Project structure
 
 ```
 src/
-  App.tsx          # UI — form + Tauri invoke
-  App.css          # Dark theme styles
+  App.tsx               # UI — form + Tauri invoke
+  App.css               # Dark theme styles
+  assets/app_icon.png   # Source app icon (1024x1024)
 src-tauri/
   src/
-    lib.rs         # Rust backend — process_excel command
+    lib.rs              # Rust backend — process_excel command
+  icons/                # Generated icon files (all sizes/formats)
   capabilities/
-    default.json   # Tauri permission grants
-  tauri.conf.json  # App config (window, bundle, identifier)
-  Cargo.toml       # Rust dependencies
+    default.json        # Tauri permission grants
+  tauri.conf.json       # App config (window, bundle, identifier)
+  Cargo.toml            # Rust dependencies
+.github/workflows/
+  build.yml             # CI — builds all platforms, releases on tag push
 ```
 
 ## Key dependencies

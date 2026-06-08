@@ -18,7 +18,8 @@ A Tauri v2 desktop app (React + TypeScript frontend, Rust backend) that processe
 ```bash
 bun run desktop      # dev mode (hot-reload frontend + Rust recompile on change)
 bun tauri build      # release build → .app + .dmg in src-tauri/target/release/bundle/
-cargo build --manifest-path src-tauri/Cargo.toml   # check Rust only
+bun tauri icon <file>                              # regenerate all icon sizes from a source image
+cargo build --manifest-path src-tauri/Cargo.toml  # check Rust only
 ```
 
 ## Key files
@@ -28,8 +29,26 @@ cargo build --manifest-path src-tauri/Cargo.toml   # check Rust only
 | `src/App.tsx` | Entire UI — 4-field form + invoke call |
 | `src/App.css` | Dark minimalistic theme |
 | `src-tauri/src/lib.rs` | Rust: `process_excel` command + Excel logic |
-| `src-tauri/tauri.conf.json` | Window config, bundle identifier, permissions |
+| `src-tauri/tauri.conf.json` | Window config, bundle identifier, product name, version |
 | `src-tauri/capabilities/default.json` | Tauri permission grants (dialog open/save) |
+| `src-tauri/icons/` | All icon sizes — generated via `bun tauri icon`, do not edit manually |
+| `.github/workflows/build.yml` | CI: builds all platforms, publishes GitHub Release on tag push |
+| `hints.md` | Local-only cheatsheet (gitignored) |
+
+## CI / releases
+
+- **Push to `main`** → builds all 4 platforms, no artifacts kept, no release created
+- **Push a `v*` tag** → same build + creates a GitHub Release with all installers attached
+- Platforms: macOS ARM, macOS Intel (cross-compiled from ARM runner), Windows, Linux
+- To release: `git tag v1.x.x && git push --tags`
+
+## Icons
+
+Source image lives at `src/assets/app_icon.png`. To regenerate all icon formats after updating it:
+```bash
+bun tauri icon src/assets/app_icon.png
+```
+This overwrites everything in `src-tauri/icons/` including `.icns`, `.ico`, all PNG sizes, and Android/iOS variants.
 
 ## Architecture notes
 
