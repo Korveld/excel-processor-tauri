@@ -9,6 +9,9 @@ on:
 
 jobs:
   build:
+    permissions:
+      contents: write
+
     strategy:
       fail-fast: false
       matrix:
@@ -67,4 +70,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          tagName: ${{ github.ref_name }}
+          releaseName: Excel Processor ${{ github.ref_name }}
+          releaseBody: See the assets below to download for your platform.
+          releaseDraft: false
+          prerelease: false
           args: ${{ matrix.args }}
