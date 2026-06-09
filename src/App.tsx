@@ -17,11 +17,11 @@ function App() {
   async function browseSource() {
     const path = await open({
       multiple: false,
-      filters: [{ name: "Excel Files", extensions: ["xlsx", "xls"] }],
+      filters: [{ name: "Spreadsheet Files", extensions: ["xlsx", "xls", "csv"] }],
     });
     if (typeof path === "string") {
       setSourceFile(path);
-      setOutputFile(path.replace(/(\.\w+)$/, "_output$1"));
+      setOutputFile(path.replace(/\.\w+$/, "_output.xlsx"));
       setSheetName("");
       setAvailableSheets([]);
       setLoadingSheets(true);
@@ -123,7 +123,7 @@ function App() {
             Processing...
           </>
         ) : (
-          "Process Excel File"
+          "Process File"
         )}
       </button>
     </main>

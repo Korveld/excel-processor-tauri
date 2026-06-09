@@ -1,6 +1,34 @@
 use umya_spreadsheet::reader::xlsx as xlsx_reader;
 use umya_spreadsheet::writer::xlsx as xlsx_writer;
 
+fn csv_to_workbook(source_path: &str) -> Result<umya_spreadsheet::Workbook, String> {
+    let mut rdr = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .from_path(source_path)
+        .map_err(|e| format!("Failed to read CSV: {}", e))?;
+
+    let mut records: Vec<Vec<String>> = Vec::new();
+    for result in rdr.records() {
+        let record = result.map_err(|e| format!("CSV parse error: {}", e))?;
+        records.push(record.iter().map(|f| f.to_string()).collect());
+    }
+
+    let mut book = umya_spreadsheet::new_file();
+    let sheet = book
+        .sheet_by_name_mut("Sheet1")
+        .map_err(|_| "Failed to get default sheet".to_string())?;
+
+    for (row_idx, record) in records.iter().enumerate() {
+        for (col_idx, field) in record.iter().enumerate() {
+            sheet
+                .cell_mut(((col_idx + 1) as u32, (row_idx + 1) as u32))
+                .set_value_string(field);
+        }
+    }
+
+    Ok(book)
+}
+
 fn extract_last_number(value: &str, search_str: &str) -> Option<i64> {
     if value.contains(search_str) {
         let last_part = value.split(';').last()?.trim();
@@ -16,8 +44,12 @@ fn process_excel_sync(
     sheet_name: String,
     search_str: String,
 ) -> Result<String, String> {
-    let mut book = xlsx_reader::read(std::path::Path::new(&source_path))
-        .map_err(|e| format!("Failed to open file: {:?}", e))?;
+    let mut book = if source_path.to_lowercase().ends_with(".csv") {
+        csv_to_workbook(&source_path)?
+    } else {
+        xlsx_reader::read(std::path::Path::new(&source_path))
+            .map_err(|e| format!("Failed to open file: {:?}", e))?
+    };
 
     // First pass (immutable): find Log Work column indices from the header row
     let log_work_cols: Vec<u32> = {
@@ -98,6 +130,9 @@ async fn process_excel(
 #[tauri::command]
 async fn get_sheet_names(source_path: String) -> Result<Vec<String>, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        if source_path.to_lowercase().ends_with(".csv") {
+            return Ok(vec!["Sheet1".to_string()]);
+        }
         let book = xlsx_reader::read(std::path::Path::new(&source_path))
             .map_err(|e| format!("Failed to open file: {:?}", e))?;
         let names: Vec<String> = book

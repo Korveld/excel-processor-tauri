@@ -2,7 +2,7 @@
 
 ## Project overview
 
-A Tauri v2 desktop app (React + TypeScript frontend, Rust backend) that processes Excel files. It reads a named sheet, finds all columns whose header starts with "Log Work", and for each cell in those columns extracts the integer after the last semicolon (if the cell string contains the user-supplied search string). The result is written to a new `.xlsx` file.
+A Tauri v2 desktop app (React + TypeScript frontend, Rust backend) that processes Excel and CSV files. It reads a named sheet (or the single "Sheet1" for CSV input), finds all columns whose header starts with "Log Work", and for each cell in those columns extracts the integer after the last semicolon (if the cell string contains the user-supplied search string). The result is written to a new `.xlsx` file.
 
 ## Stack
 
@@ -10,6 +10,7 @@ A Tauri v2 desktop app (React + TypeScript frontend, Rust backend) that processe
 - **Backend**: Rust (Tauri v2) — lives in `src-tauri/src/lib.rs`
 - **Package manager**: bun
 - **Excel reading + writing**: `umya-spreadsheet 3`
+- **CSV parsing**: `csv 1`
 - **File dialogs**: `tauri-plugin-dialog 2`
 
 ## Commands
@@ -54,7 +55,8 @@ This overwrites everything in `src-tauri/icons/` including `.icns`, `.ico`, all 
 - Both Tauri commands are `async` and use `tauri::async_runtime::spawn_blocking` to run blocking file I/O on a thread pool, keeping the macOS event loop free (avoids beachball).
 - `flushSync` is used in the React handler before `invoke` to guarantee the spinner renders before the Rust work begins (React 18 batches state updates and would otherwise defer the repaint until after the async call).
 - File dialogs are handled entirely on the JS side via `@tauri-apps/plugin-dialog` — no Rust command needed for open/save pickers.
-- When a source file is picked, `browseSource` calls `get_sheet_names` to populate a `<select>` with the available sheets (auto-selects if only one), and auto-fills the output path as `<source>_output.xlsx`.
+- When a source file is picked, `browseSource` calls `get_sheet_names` to populate a `<select>` with the available sheets (auto-selects if only one), and auto-fills the output path as `<source>_output.xlsx`. This works uniformly for both `.xlsx`/`.xls` and `.csv` inputs — the output is always `.xlsx`.
+- CSV input is supported: `get_sheet_names` returns `["Sheet1"]` for `.csv` files. `process_excel_sync` detects the `.csv` extension, calls `csv_to_workbook` to parse the file into an in-memory `Workbook` with a single "Sheet1", then proceeds with the same Log Work column logic as for native Excel files.
 - `std::panic::catch_unwind` wraps the sync processing in `process_excel` so any unexpected library panics are caught and returned as user-visible error messages rather than silently crashing.
 - Excel processing modifies the source workbook in-place (read → mutate Log Work columns → write to output path) rather than building a new workbook from scratch. This preserves all cell styles including date number formats on columns like Created/Updated/Last Viewed.
 - Excel I/O uses `umya-spreadsheet` (replaces the original `calamine` + `rust_xlsxwriter` pair). `calamine` had a persistent panic on multi-byte Unicode characters (e.g. `→`) in cell values — `umya-spreadsheet` handles these correctly.

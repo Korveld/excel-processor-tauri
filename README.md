@@ -1,13 +1,15 @@
 # Excel Processor
 
-A cross-platform desktop app for processing Excel log files. Built with Tauri v2, React, and Rust. Runs on macOS, Windows, and Linux.
+A cross-platform desktop app for processing Excel and CSV log files. Built with Tauri v2, React, and Rust. Runs on macOS, Windows, and Linux.
 
 ## What it does
 
-1. Opens a source `.xlsx` file and reads a named sheet
+1. Opens a source `.xlsx`, `.xls`, or `.csv` file and reads a named sheet
 2. Finds all columns whose header starts with **"Log Work"**
 3. For each cell in those columns: if the cell contains the search string, extracts the integer after the last `;`
 4. Saves the result to a new `.xlsx` file
+
+CSV files are converted to a single-sheet workbook automatically — no manual conversion needed.
 
 Example — a cell value of `foo Jan/25; bar; 8` with search string `Jan/25` becomes `8`.
 
@@ -73,5 +75,6 @@ src-tauri/
 |------------|---------|------|
 | `tauri` | 2 | App framework |
 | `umya-spreadsheet` | 3 | Read and write `.xlsx` files |
+| `csv` | 1 | Parse `.csv` input files |
 | `tauri-plugin-dialog` | 2 | Native file open/save dialogs |
 | `react` | 19 | UI |
