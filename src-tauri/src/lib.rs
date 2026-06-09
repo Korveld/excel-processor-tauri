@@ -16,70 +16,56 @@ fn process_excel_sync(
     sheet_name: String,
     search_str: String,
 ) -> Result<String, String> {
-    let book = xlsx_reader::read(std::path::Path::new(&source_path))
+    let mut book = xlsx_reader::read(std::path::Path::new(&source_path))
         .map_err(|e| format!("Failed to open file: {:?}", e))?;
 
+    // First pass (immutable): find Log Work column indices from the header row
+    let log_work_cols: Vec<u32> = {
+        let sheet = book
+            .sheet_by_name(&sheet_name)
+            .map_err(|_| format!("Sheet '{}' not found", sheet_name))?;
+
+        if sheet.highest_row() == 0 {
+            return Err("Sheet is empty".to_string());
+        }
+
+        let max_col = sheet.highest_column();
+        (1..=max_col)
+            .filter(|&col| {
+                sheet
+                    .cell((col, 1))
+                    .map(|c| c.value().starts_with("Log Work"))
+                    .unwrap_or(false)
+            })
+            .collect()
+    };
+
+    // Second pass (mutable): transform Log Work cells in-place, leaving all other
+    // cells (including date-formatted ones) untouched so their styles are preserved
     let sheet = book
-        .sheet_by_name(&sheet_name)
+        .sheet_by_name_mut(&sheet_name)
         .map_err(|_| format!("Sheet '{}' not found", sheet_name))?;
 
     let max_row = sheet.highest_row();
-    let max_col = sheet.highest_column();
 
-    if max_row == 0 {
-        return Err("Sheet is empty".to_string());
-    }
-
-    // Collect all cell values
-    let mut data: Vec<Vec<String>> = (1..=max_row)
-        .map(|row| {
-            (1..=max_col)
-                .map(|col| {
-                    sheet
-                        .cell((col, row))
-                        .map(|c| c.value().to_string())
-                        .unwrap_or_default()
-                })
-                .collect()
-        })
-        .collect();
-
-    // Find "Log Work" column indices (0-based)
-    let log_work_indices: Vec<usize> = data[0]
-        .iter()
-        .enumerate()
-        .filter(|(_, h)| h.starts_with("Log Work"))
-        .map(|(i, _)| i)
-        .collect();
-
-    // Transform Log Work cells in data rows
-    for row in data.iter_mut().skip(1) {
-        for &col_idx in &log_work_indices {
-            if let Some(cell) = row.get_mut(col_idx) {
-                *cell = extract_last_number(cell, &search_str)
-                    .map(|n| n.to_string())
-                    .unwrap_or_default();
+    for row in 2..=max_row {
+        for &col in &log_work_cols {
+            let current = match sheet.cell((col, row)) {
+                Some(c) => c.value().to_string(),
+                None => continue,
+            };
+            if current.is_empty() {
+                continue;
+            }
+            if let Some(n) = extract_last_number(&current, &search_str) {
+                sheet.cell_mut((col, row)).set_value_number(n as f64);
+            } else {
+                sheet.cell_mut((col, row)).set_value_string("");
             }
         }
     }
 
-    // Write output
-    let mut out_book = umya_spreadsheet::new_file();
-    let out_sheet = out_book
-        .sheet_mut(0_usize)
-        .map_err(|e| format!("{:?}", e))?;
-
-    for (row_idx, row) in data.iter().enumerate() {
-        for (col_idx, value) in row.iter().enumerate() {
-            if !value.is_empty() {
-                let r = (row_idx + 1) as u32;
-                let c = (col_idx + 1) as u32;
-                out_sheet.cell_mut((c, r)).set_value(value.clone());
-            }
-        }
-    }
-
-    xlsx_writer::write(&out_book, std::path::Path::new(&output_path))
+    xlsx_writer::write(&book, std::path::Path::new(&output_path))
         .map_err(|e| format!("Failed to save: {:?}", e))?;
 
     Ok(format!("Processing complete! Saved to: {}", output_path))
@@ -109,12 +95,28 @@ async fn process_excel(
     .map_err(|e| e.to_string())?
 }
 
+#[tauri::command]
+async fn get_sheet_names(source_path: String) -> Result<Vec<String>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let book = xlsx_reader::read(std::path::Path::new(&source_path))
+            .map_err(|e| format!("Failed to open file: {:?}", e))?;
+        let names: Vec<String> = book
+            .sheet_collection()
+            .iter()
+            .map(|s| s.name().to_string())
+            .collect();
+        Ok(names)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![process_excel])
+        .invoke_handler(tauri::generate_handler![process_excel, get_sheet_names])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

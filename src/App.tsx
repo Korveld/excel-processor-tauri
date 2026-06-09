@@ -9,6 +9,8 @@ function App() {
   const [outputFile, setOutputFile] = useState("");
   const [sheetName, setSheetName] = useState("");
   const [searchStr, setSearchStr] = useState("");
+  const [availableSheets, setAvailableSheets] = useState<string[]>([]);
+  const [loadingSheets, setLoadingSheets] = useState(false);
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [processing, setProcessing] = useState(false);
 
@@ -17,7 +19,22 @@ function App() {
       multiple: false,
       filters: [{ name: "Excel Files", extensions: ["xlsx", "xls"] }],
     });
-    if (typeof path === "string") setSourceFile(path);
+    if (typeof path === "string") {
+      setSourceFile(path);
+      setOutputFile(path.replace(/(\.\w+)$/, "_output$1"));
+      setSheetName("");
+      setAvailableSheets([]);
+      setLoadingSheets(true);
+      try {
+        const sheets = await invoke<string[]>("get_sheet_names", { sourcePath: path });
+        setAvailableSheets(sheets);
+        if (sheets.length === 1) setSheetName(sheets[0]);
+      } catch (e) {
+        setStatus({ type: "error", message: `Failed to read sheets: ${e}` });
+      } finally {
+        setLoadingSheets(false);
+      }
+    }
   }
 
   async function browseOutput() {
@@ -68,11 +85,24 @@ function App() {
 
       <div className="field">
         <label>Sheet Name:</label>
-        <input
-          type="text"
+        <select
           value={sheetName}
           onChange={(e) => setSheetName(e.target.value)}
-        />
+          disabled={loadingSheets || availableSheets.length === 0}
+        >
+          {loadingSheets ? (
+            <option value="">Loading sheets…</option>
+          ) : availableSheets.length === 0 ? (
+            <option value="">Select a source file first</option>
+          ) : (
+            <>
+              {availableSheets.length > 1 && <option value="">— select a sheet —</option>}
+              {availableSheets.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </>
+          )}
+        </select>
       </div>
 
       <div className="field">

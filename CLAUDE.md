@@ -27,7 +27,7 @@ cargo build --manifest-path src-tauri/Cargo.toml  # check Rust only
 |------|---------|
 | `src/App.tsx` | Entire UI — 4-field form + invoke call |
 | `src/App.css` | Dark minimalistic theme |
-| `src-tauri/src/lib.rs` | Rust: `process_excel` command + Excel logic |
+| `src-tauri/src/lib.rs` | Rust: `process_excel`, `get_sheet_names` commands + Excel logic |
 | `src-tauri/tauri.conf.json` | Window config, bundle identifier, product name, version |
 | `src-tauri/capabilities/default.json` | Tauri permission grants (dialog open/save) |
 | `src-tauri/icons/` | All icon sizes — generated via `bun tauri icon`, do not edit manually |
@@ -51,9 +51,11 @@ This overwrites everything in `src-tauri/icons/` including `.icns`, `.ico`, all 
 
 ## Architecture notes
 
-- The `process_excel` Tauri command is `async` and uses `tauri::async_runtime::spawn_blocking` to run the blocking file I/O on a thread pool, keeping the macOS event loop free (avoids beachball).
+- Both Tauri commands are `async` and use `tauri::async_runtime::spawn_blocking` to run blocking file I/O on a thread pool, keeping the macOS event loop free (avoids beachball).
 - `flushSync` is used in the React handler before `invoke` to guarantee the spinner renders before the Rust work begins (React 18 batches state updates and would otherwise defer the repaint until after the async call).
 - File dialogs are handled entirely on the JS side via `@tauri-apps/plugin-dialog` — no Rust command needed for open/save pickers.
-- `std::panic::catch_unwind` wraps the sync processing so any unexpected library panics are caught and returned as user-visible error messages rather than silently crashing.
+- When a source file is picked, `browseSource` calls `get_sheet_names` to populate a `<select>` with the available sheets (auto-selects if only one), and auto-fills the output path as `<source>_output.xlsx`.
+- `std::panic::catch_unwind` wraps the sync processing in `process_excel` so any unexpected library panics are caught and returned as user-visible error messages rather than silently crashing.
+- Excel processing modifies the source workbook in-place (read → mutate Log Work columns → write to output path) rather than building a new workbook from scratch. This preserves all cell styles including date number formats on columns like Created/Updated/Last Viewed.
 - Excel I/O uses `umya-spreadsheet` (replaces the original `calamine` + `rust_xlsxwriter` pair). `calamine` had a persistent panic on multi-byte Unicode characters (e.g. `→`) in cell values — `umya-spreadsheet` handles these correctly.
 - DevTools can be re-enabled for debugging by adding `.setup(|app| { app.get_webview_window("main").unwrap().open_devtools(); Ok(()) })` to the Tauri builder in `lib.rs` (guarded with `#[cfg(debug_assertions)]`).
